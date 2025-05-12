@@ -5,6 +5,8 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class LocalDataSource(application: Application) {
@@ -13,8 +15,14 @@ class LocalDataSource(application: Application) {
   fun getAllMovies(): LiveData<List<Movie>> {
     val liveData = MutableLiveData<List<Movie>>()
     CoroutineScope(Dispatchers.IO).launch {
-      val movies = movieDao.all.blockingFirst()
-      liveData.postValue(movies)
+      // Для Flow:
+      movieDao.getMoviesFlow().collect { movies ->
+        liveData.postValue(movies)
+      }
+
+      // Или если используем suspend функцию:
+      // val movies = movieDao.getAllMoviesSuspend()
+      // liveData.postValue(movies)
     }
     return liveData
   }
