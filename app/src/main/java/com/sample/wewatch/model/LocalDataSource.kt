@@ -1,38 +1,33 @@
 package com.sample.wewatch.model
 
 import android.app.Application
-import io.reactivex.Observable
-import kotlin.concurrent.thread
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
+class LocalDataSource(application: Application) {
+  private val movieDao: MovieDao = LocalDatabase.getInstance(application).movieDao()
 
-open class LocalDataSource(application: Application) {
-
-  private val movieDao: MovieDao
-  open val allMovies: Observable<List<Movie>>
-
-  init {
-    val db = LocalDatabase.getInstance(application)
-    movieDao = db.movieDao()
-    allMovies = movieDao.all
-  }
-
-
-  fun insert(movie: Movie) {
-    thread {
-      movieDao.insert(movie)
+  fun getAllMovies(): LiveData<List<Movie>> {
+    val liveData = MutableLiveData<List<Movie>>()
+    CoroutineScope(Dispatchers.IO).launch {
+      val movies = movieDao.all.blockingFirst()
+      liveData.postValue(movies)
     }
+    return liveData
   }
 
-  fun delete(movie: Movie) {
-    thread {
-      movieDao.delete(movie.id)
-    }
+  suspend fun insert(movie: Movie) {
+    movieDao.insert(movie)
   }
 
-  fun update(movie: Movie) {
-    thread {
-      movieDao.update(movie)
-    }
+  suspend fun delete(movie: Movie) {
+    movieDao.delete(movie.id)
   }
 
+  suspend fun update(movie: Movie) {
+    movieDao.update(movie)
+  }
 }
