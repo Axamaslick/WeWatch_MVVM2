@@ -14,6 +14,10 @@ import com.sample.wewatch.model.Movie
 import com.sample.wewatch.network.RetrofitClient.TMDB_IMAGEURL
 
 import com.squareup.picasso.Picasso
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 open class AddMovieActivity : AppCompatActivity() {
   private lateinit var titleEditText: EditText
@@ -44,19 +48,31 @@ open class AddMovieActivity : AppCompatActivity() {
 
   //addMovie onClick
   fun onClickAddMovie(v: View) {
-
     if (TextUtils.isEmpty(titleEditText.text)) {
       showToast("Movie title cannot be empty")
-    } else {
-      val title = titleEditText.text.toString()
-      val releaseDate = releaseDateEditText.text.toString()
-      val posterPath = if (movieImageView.tag != null) movieImageView.tag.toString() else ""
+      return
+    }
 
-      val movie = Movie(title = title, releaseDate = releaseDate, posterPath = posterPath)
-      dataSource.insert(movie)
+    val title = titleEditText.text.toString()
+    val releaseDate = releaseDateEditText.text.toString()
+    val posterPath = movieImageView.tag?.toString() ?: ""
 
-      setResult(Activity.RESULT_OK)
-      finish()
+    val movie = Movie(title = title, releaseDate = releaseDate, posterPath = posterPath)
+
+    // Запускаем корутину для выполнения в фоне
+    CoroutineScope(Dispatchers.IO).launch {
+      try {
+        dataSource.insert(movie)
+        // Возвращаемся в главный поток для UI операций
+        withContext(Dispatchers.Main) {
+          setResult(Activity.RESULT_OK)
+          finish()
+        }
+      } catch (e: Exception) {
+        withContext(Dispatchers.Main) {
+          showToast("Error saving movie: ${e.message}")
+        }
+      }
     }
   }
 
