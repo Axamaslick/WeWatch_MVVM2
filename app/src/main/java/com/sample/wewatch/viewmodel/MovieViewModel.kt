@@ -4,15 +4,15 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
 import com.sample.wewatch.model.LocalDataSource
 import com.sample.wewatch.model.Movie
-import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.CompositeDisposable
-import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MovieViewModel(application: Application) : AndroidViewModel(application) {
     private val dataSource = LocalDataSource(application)
-    private val disposables = CompositeDisposable()
 
     private val _movies = MutableLiveData<List<Movie>>()
     val movies: LiveData<List<Movie>> = _movies
@@ -24,32 +24,37 @@ class MovieViewModel(application: Application) : AndroidViewModel(application) {
     val loading: LiveData<Boolean> = _loading
 
     fun loadMovies() {
-        _loading.value = true
-        val disposable = dataSource.allMovies
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe(
-                { movies ->
-                    _movies.value = movies
-                    _loading.value = false
-                },
-                { e ->
-                    _error.value = "Error fetching movies: ${e.message}"
-                    _loading.value = false
+        viewModelScope.launch {
+            _loading.value = true
+            try {
+                // Используем существующий метод getAllMovies() из LocalDataSource
+                val moviesLiveData = withContext(Dispatchers.IO) {
+                    dataSource.getAllMovies()
                 }
-            )
-        disposables.add(disposable)
+                moviesLiveData.observeForever { movies ->
+                    _movies.value = movies
+                }
+            } catch (e: Exception) {
+                _error.value = "Error fetching movies: ${e.message}"
+            } finally {
+                _loading.value = false
+            }
+        }
     }
 
     fun deleteMovies(moviesToDelete: List<Movie>) {
-        moviesToDelete.forEach { movie ->
-            dataSource.delete(movie)
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    moviesToDelete.forEach { movie ->
+                        dataSource.delete(movie)
+                    }
+                }
+                // После удаления перезагружаем список
+                loadMovies()
+            } catch (e: Exception) {
+                _error.value = "Error deleting movies: ${e.message}"
+            }
         }
-        loadMovies() // Обновляем список после удаления
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        disposables.dispose()
     }
 }

@@ -38,4 +38,5 @@ class LocalDataSource(application: Application) {
   suspend fun update(movie: Movie) {
     movieDao.update(movie)
   }
+
 }
